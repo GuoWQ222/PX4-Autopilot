@@ -90,7 +90,7 @@ MulticopterAttitudeControl::parameters_updated()
 {
 	// Store some of the parameters in a more convenient way & precompute often-used values
 	_attitude_control.setProportionalGain(Vector3f(_param_mc_roll_p.get(), _param_mc_pitch_p.get(), _param_mc_yaw_p.get()),
-					      _param_mc_yaw_weight.get());
+					_param_mc_yaw_weight.get());
 
 	// angular rate limits
 	using math::radians;
@@ -103,6 +103,23 @@ MulticopterAttitudeControl::parameters_updated()
 	}
 
 	_man_tilt_max = math::radians(_param_mpc_man_tilt_max.get());
+
+	// Update ADRC parameters
+	_adrc_enabled = (_param_mc_adrc_att_en.get() > 0);
+	if (_adrc_enabled) {
+		_adrc_attitude_control.setADRCAttitudeGains(
+			_param_mc_adrc_td_r2.get(),
+			_param_mc_adrc_td_h2f.get(),
+			_param_mc_adrc_td_r0.get(),
+			_param_mc_adrc_nlsef_r1.get(),
+			_param_mc_adrc_nlsef_h1.get(),
+			_param_mc_adrc_nlsef_c.get(),
+			_param_mc_adrc_nlsef_ki.get(),
+			_param_mc_adrc_leso_w.get(),
+			_param_mc_adrc_gamma.get(),
+			_param_mc_adrc_b0.get()
+		);
+	}
 }
 
 float
@@ -114,7 +131,7 @@ MulticopterAttitudeControl::throttle_curve(float throttle_stick_input)
 	switch (_param_mpc_thr_curve.get()) {
 	case 1: // no rescaling
 		thrust = math::interpolate(throttle_stick_input, -1.f, 1.f,
-					   _manual_throttle_minimum.getState(), _param_mpc_thr_max.get());
+					_manual_throttle_minimum.getState(), _param_mpc_thr_max.get());
 		break;
 
 	case 2: // rescale to hover thrust param at 0 stick input
@@ -147,9 +164,9 @@ MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt)
 
 	const float yaw = Eulerf(q).psi();
 	const float yaw_stick_input = math::expo_deadzone(_manual_control_setpoint.yaw, _param_mpc_yaw_expo.get(),
-				      _param_mpc_hold_dz.get());
+				_param_mpc_hold_dz.get());
 	_stick_yaw.generateYawSetpoint(attitude_setpoint.yaw_sp_move_rate, _yaw_setpoint_stabilized, yaw_stick_input, yaw, dt,
-				       _unaided_heading);
+				_unaided_heading);
 
 	/*
 	 * Input mapping for roll & pitch setpoints
@@ -238,6 +255,9 @@ MulticopterAttitudeControl::Run()
 		}
 	}
 
+	// Update ADRC observer at high frequency (always call, even if ADRC is disabled)
+	update_adrc_observer();
+
 	// run controller on attitude updates
 	vehicle_attitude_s v_att;
 
@@ -289,14 +309,14 @@ MulticopterAttitudeControl::Run()
 		const bool is_tailsitter_transition = (_vtol_tailsitter && _vtol_in_transition_mode);
 
 		const bool run_att_ctrl = _vehicle_control_mode.flag_control_attitude_enabled
-					  && (is_hovering || is_tailsitter_transition);
+					&& (is_hovering || is_tailsitter_transition);
 
 		if (run_att_ctrl) {
 			// Generate the attitude setpoint from stick inputs if we are in Manual/Stabilized mode
 			if (_vehicle_control_mode.flag_control_manual_enabled &&
-			    !_vehicle_control_mode.flag_control_altitude_enabled &&
-			    !_vehicle_control_mode.flag_control_velocity_enabled &&
-			    !_vehicle_control_mode.flag_control_position_enabled) {
+				!_vehicle_control_mode.flag_control_altitude_enabled &&
+				!_vehicle_control_mode.flag_control_velocity_enabled &&
+				!_vehicle_control_mode.flag_control_position_enabled) {
 
 				generate_attitude_setpoint(q, dt);
 
@@ -312,11 +332,14 @@ MulticopterAttitudeControl::Run()
 				vehicle_attitude_setpoint_s vehicle_attitude_setpoint;
 
 				if (_vehicle_attitude_setpoint_sub.copy(&vehicle_attitude_setpoint)
-				    && (vehicle_attitude_setpoint.timestamp > _last_attitude_setpoint)) {
+					&& (vehicle_attitude_setpoint.timestamp > _last_attitude_setpoint)) {
 
 					_attitude_control.setAttitudeSetpoint(Quatf(vehicle_attitude_setpoint.q_d), vehicle_attitude_setpoint.yaw_sp_move_rate);
 					_thrust_setpoint_body = Vector3f(vehicle_attitude_setpoint.thrust_body);
 					_last_attitude_setpoint = vehicle_attitude_setpoint.timestamp;
+
+					// Update base throttle for ADRC control
+					_base_throttle = -_thrust_setpoint_body(2); // Convert thrust to throttle (thrust is negative)
 				}
 			}
 
@@ -340,17 +363,129 @@ MulticopterAttitudeControl::Run()
 				_quat_reset_counter = v_att.quat_reset_counter;
 			}
 
-			Vector3f rates_sp = _attitude_control.update(q);
+			Vector3f rates_sp;
+
+			// Get angular velocity data
+			vehicle_angular_velocity_s v_angular_velocity;
+			_vehicle_angular_velocity_sub.update(&v_angular_velocity);
+
+			// Get position data for debugging
+			vehicle_local_position_s local_pos{};
+			_vehicle_local_position_sub.copy(&local_pos);
+
+			// Choose between ADRC and traditional attitude control
+			if (_adrc_enabled && _param_mc_adrc_att_en.get() == 1) {
+				// ADRC attitude control for roll and pitch only
+				const Quatf q_setpoint = _attitude_control.getAttitudeSetpoint();
+				const Eulerf attitude_error = Eulerf(q.inversed() * q_setpoint);
+				const Vector3f angular_velocity(v_angular_velocity.xyz[0], v_angular_velocity.xyz[1], v_angular_velocity.xyz[2]);
+
+				// Run ADRC attitude control
+				const Vector3f adrc_output = _adrc_attitude_control.update(
+					Vector3f(attitude_error.phi(), attitude_error.theta(), attitude_error.psi()),
+					angular_velocity,
+					_base_throttle
+				);
+
+				// Use ADRC output for roll and pitch, traditional PID for yaw
+				const Vector3f traditional_rates_sp = _attitude_control.update(q);
+				rates_sp = Vector3f(adrc_output(0), adrc_output(1), traditional_rates_sp(2));
+
+				// Debug output for ADRC attitude control (rate limited to avoid spam)
+				static hrt_abstime last_debug_time = 0;
+				static Vector3f last_position{0.0f, 0.0f, 0.0f};
+				static Vector3f last_attitude_error{0.0f, 0.0f, 0.0f};
+				static Vector3f last_angular_vel{0.0f, 0.0f, 0.0f};
+				static Vector3f last_rates_sp{0.0f, 0.0f, 0.0f};
+				static float last_thrust = 0.0f;
+
+				const hrt_abstime current_time = hrt_absolute_time();
+				const Vector3f current_position{local_pos.x, local_pos.y, local_pos.z};
+				const Vector3f current_attitude_error{attitude_error.phi(), attitude_error.theta(), attitude_error.psi()};
+				const Vector3f current_angular_vel{angular_velocity};
+				const Vector3f current_rates_sp{rates_sp};
+				const float current_thrust = -_thrust_setpoint_body(2);
+
+				// Output every 500ms and only if values changed significantly
+				if ((current_time - last_debug_time) > 500000 && // 500ms = 500000us
+					(fabsf(current_position(0) - last_position(0)) > 0.01f ||
+					fabsf(current_position(1) - last_position(1)) > 0.01f ||
+					fabsf(current_position(2) - last_position(2)) > 0.01f ||
+					fabsf(current_attitude_error(0) - last_attitude_error(0)) > 0.01f ||
+					fabsf(current_attitude_error(1) - last_attitude_error(1)) > 0.01f ||
+					fabsf(current_attitude_error(2) - last_attitude_error(2)) > 0.01f ||
+					fabsf(current_angular_vel(0) - last_angular_vel(0)) > 0.01f ||
+					fabsf(current_angular_vel(1) - last_angular_vel(1)) > 0.01f ||
+					fabsf(current_angular_vel(2) - last_angular_vel(2)) > 0.01f ||
+					fabsf(current_thrust - last_thrust) > 0.01f)) {
+
+					PX4_INFO("[ADRC_ATT_DEBUG] 位置: x=%.3f,y=%.3f,z=%.3f | 姿态误差: %.3f,%.3f,%.3f | 角速度: %.3f,%.3f,%.3f | 角速度设定值: %.3f,%.3f,%.3f | 推力: %.3f",
+						(double)current_position(0), (double)current_position(1), (double)current_position(2),
+						(double)current_attitude_error(0), (double)current_attitude_error(1), (double)current_attitude_error(2),
+						(double)current_angular_vel(0), (double)current_angular_vel(1), (double)current_angular_vel(2),
+						(double)current_rates_sp(0), (double)current_rates_sp(1), (double)current_rates_sp(2),
+						(double)current_thrust);
+
+					last_debug_time = current_time;
+					last_position = current_position;
+					last_attitude_error = current_attitude_error;
+					last_angular_vel = current_angular_vel;
+					last_rates_sp = current_rates_sp;
+					last_thrust = current_thrust;
+				}
+
+			} else if (_adrc_enabled && _param_mc_adrc_att_en.get() == 2) {
+				// Full ADRC attitude control (all axes) - not implemented in this version
+				rates_sp = _attitude_control.update(q);
+
+			} else {
+				// Traditional PID attitude control
+				rates_sp = _attitude_control.update(q);
+
+				// Debug output for traditional PID attitude control (rate limited)
+				static hrt_abstime last_pid_debug_time = 0;
+				static Vector3f last_pid_position{0.0f, 0.0f, 0.0f};
+				static Vector3f last_pid_rates_sp{0.0f, 0.0f, 0.0f};
+				static float last_pid_thrust = 0.0f;
+
+				const hrt_abstime current_time = hrt_absolute_time();
+				const Vector3f current_position{local_pos.x, local_pos.y, local_pos.z};
+				const Vector3f current_rates_sp{rates_sp};
+				const float current_thrust = -_thrust_setpoint_body(2);
+
+				// Output every 500ms and only if values changed significantly
+				if ((current_time - last_pid_debug_time) > 500000 && // 500ms = 500000us
+					(fabsf(current_position(0) - last_pid_position(0)) > 0.01f ||
+					fabsf(current_position(1) - last_pid_position(1)) > 0.01f ||
+					fabsf(current_position(2) - last_pid_position(2)) > 0.01f ||
+					fabsf(current_rates_sp(0) - last_pid_rates_sp(0)) > 0.01f ||
+					fabsf(current_rates_sp(1) - last_pid_rates_sp(1)) > 0.01f ||
+					fabsf(current_rates_sp(2) - last_pid_rates_sp(2)) > 0.01f ||
+					fabsf(current_thrust - last_pid_thrust) > 0.01f)) {
+
+					const Eulerf euler_current = Eulerf(q);
+					PX4_INFO("[PID_ATT_DEBUG] 位置: x=%.3f,y=%.3f,z=%.3f | 姿态: %.3f,%.3f,%.3f | 角速度设定值: %.3f,%.3f,%.3f | 推力: %.3f",
+						(double)current_position(0), (double)current_position(1), (double)current_position(2),
+						(double)euler_current.phi(), (double)euler_current.theta(), (double)euler_current.psi(),
+						(double)current_rates_sp(0), (double)current_rates_sp(1), (double)current_rates_sp(2),
+						(double)current_thrust);
+
+					last_pid_debug_time = current_time;
+					last_pid_position = current_position;
+					last_pid_rates_sp = current_rates_sp;
+					last_pid_thrust = current_thrust;
+				}
+			}
 
 			const hrt_abstime now = hrt_absolute_time();
 			autotune_attitude_control_status_s pid_autotune;
 
 			if (_autotune_attitude_control_status_sub.copy(&pid_autotune)) {
 				if ((pid_autotune.state == autotune_attitude_control_status_s::STATE_ROLL
-				     || pid_autotune.state == autotune_attitude_control_status_s::STATE_PITCH
-				     || pid_autotune.state == autotune_attitude_control_status_s::STATE_YAW
-				     || pid_autotune.state == autotune_attitude_control_status_s::STATE_TEST)
-				    && ((now - pid_autotune.timestamp) < 1_s)) {
+					|| pid_autotune.state == autotune_attitude_control_status_s::STATE_PITCH
+					|| pid_autotune.state == autotune_attitude_control_status_s::STATE_YAW
+					|| pid_autotune.state == autotune_attitude_control_status_s::STATE_TEST)
+					&& ((now - pid_autotune.timestamp) < 1_s)) {
 					rates_sp += Vector3f(pid_autotune.rate_sp);
 				}
 			}
@@ -423,6 +558,32 @@ int MulticopterAttitudeControl::task_spawn(int argc, char *argv[])
 	_task_id = -1;
 
 	return PX4_ERROR;
+}
+
+void
+MulticopterAttitudeControl::update_adrc_observer()
+{
+	if (!_adrc_enabled) {
+		return;
+	}
+
+	// High-frequency observer update (1kHz like StarryPilot)
+	const hrt_abstime now = hrt_absolute_time();
+	const int observer_freq = _param_mc_adrc_obs_freq.get();
+	const hrt_abstime observer_dt_us = 1000000 / observer_freq; // Convert Hz to microseconds
+
+	if ((now - _last_adrc_observer_update) >= observer_dt_us) {
+		// Get current angular velocity
+		vehicle_angular_velocity_s v_angular_velocity{};
+		if (_vehicle_angular_velocity_sub.copy(&v_angular_velocity)) {
+			const matrix::Vector3f angular_velocity(v_angular_velocity.xyz[0], v_angular_velocity.xyz[1], v_angular_velocity.xyz[2]);
+
+			// Update ADRC observer with current angular velocity and base throttle
+			_adrc_attitude_control.observerUpdate(angular_velocity, _base_throttle);
+
+			_last_adrc_observer_update = now;
+		}
+	}
 }
 
 int MulticopterAttitudeControl::custom_command(int argc, char *argv[])

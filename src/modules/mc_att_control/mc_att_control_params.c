@@ -158,3 +158,156 @@ PARAM_DEFINE_FLOAT(MC_YAWRATE_MAX, 200.0f);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_FLOAT(MC_MAN_TILT_TAU, 0.0f);
+
+/**
+ * Enable ADRC attitude control
+ *
+ * Enable Active Disturbance Rejection Control (ADRC) for attitude control.
+ * 0: Disabled (use traditional PID)
+ * 1: ADRC enabled for roll and pitch only
+ * 2: Full ADRC for all axes
+ *
+ * @min 0
+ * @max 2
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_ADRC_ATT_EN, 2);
+
+/**
+ * ADRC TD Control R2 parameter
+ *
+ * Tracking differentiator control gain for ADRC attitude control.
+ * Higher values provide faster tracking but may introduce oscillations.
+ *
+ * @min 1.0
+ * @max 100.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_R2, 15.0f);
+
+/**
+ * ADRC TD Control H2 factor
+ *
+ * Tracking differentiator bandwidth factor for ADRC attitude control.
+ * Multiplied by sample time to get actual bandwidth.
+ *
+ * @min 1.0
+ * @max 50.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_H2F, 10.0f);
+
+/**
+ * ADRC TD R0 parameter
+ *
+ * Tracking differentiator gain for derivative calculation in ADRC.
+ *
+ * @min 100.0
+ * @max 5000.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_R0, 500.0f);
+
+/**
+ * ADRC NLSEF R1 parameter
+ *
+ * Nonlinear state error feedback gain for ADRC attitude control.
+ *
+ * @min 10.0
+ * @max 500.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_NLSEF_R1, 50.0f);
+
+/**
+ * ADRC NLSEF H1 factor
+ *
+ * Nonlinear state error feedback bandwidth factor for ADRC attitude control.
+ * Multiplied by sample time to get actual bandwidth.
+ *
+ * @min 10.0
+ * @max 200.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_NLSEF_H1, 25.0f);
+
+/**
+ * ADRC NLSEF C parameter
+ *
+ * Nonlinear state error feedback damping coefficient for ADRC attitude control.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 3
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_NLSEF_C, 0.02f);
+
+/**
+ * ADRC NLSEF integral gain
+ *
+ * Integral gain for ADRC attitude control to eliminate steady-state errors.
+ *
+ * @min 0.0
+ * @max 0.2
+ * @decimal 3
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_NLSEF_KI, 0.02f);
+
+/**
+ * ADRC LESO bandwidth
+ *
+ * Linear Extended State Observer bandwidth for ADRC attitude control.
+ * Higher values provide faster disturbance estimation but may be more sensitive to noise.
+ *
+ * @min 50.0
+ * @max 500.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_LESO_W, 60.0f);
+
+/**
+ * ADRC disturbance compensation gain
+ *
+ * Gamma parameter for disturbance compensation in ADRC attitude control.
+ * Controls how much of the estimated disturbance is compensated.
+ *
+ * @min 0.0
+ * @max 1.0
+ * @decimal 2
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_GAMMA, 0.30f);
+
+/**
+ * ADRC control effectiveness parameter
+ *
+ * B0 parameter representing the control effectiveness in ADRC attitude control.
+ * Should be tuned based on vehicle characteristics.
+ *
+ * @min 100.0
+ * @max 1000.0
+ * @decimal 1
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_B0, 200.0f);
+
+/**
+ * ADRC observer update frequency
+ *
+ * Frequency at which the ADRC observer is updated. Higher frequencies improve
+ * disturbance estimation accuracy but increase computational load.
+ *
+ * @unit Hz
+ * @min 100
+ * @max 2000
+ * @group ADRC Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_ADRC_OBS_FREQ, 250);

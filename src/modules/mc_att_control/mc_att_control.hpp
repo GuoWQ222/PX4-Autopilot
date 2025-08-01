@@ -49,6 +49,7 @@
 #include <uORB/topics/autotune_attitude_control_status.h>
 #include <uORB/topics/hover_thrust_estimate.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
@@ -58,6 +59,7 @@
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/slew_rate/SlewRate.hpp>
 #include <lib/stick_yaw/StickYaw.hpp>
+#include <lib/rate_control/adrc_attitude_control.hpp>
 
 #include <AttitudeControl.hpp>
 
@@ -96,7 +98,13 @@ private:
 	 */
 	void generate_attitude_setpoint(const matrix::Quatf &q, float dt);
 
+	/**
+	 * Update ADRC observer at high frequency (1kHz)
+	 */
+	void update_adrc_observer();
+
 	AttitudeControl _attitude_control; /**< class for attitude control calculations */
+	ADRCAttitudeControl _adrc_attitude_control; /**< ADRC attitude control */
 	StickYaw _stick_yaw{this};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
@@ -109,6 +117,7 @@ private:
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 	uORB::Subscription _vehicle_local_position_sub{ORB_ID(vehicle_local_position)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _vehicle_angular_velocity_sub{ORB_ID(vehicle_angular_velocity)};
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_attitude_sub{this, ORB_ID(vehicle_attitude)};
 
@@ -137,6 +146,11 @@ private:
 
 	hrt_abstime _last_run{0};
 	hrt_abstime _last_attitude_setpoint{0};
+	hrt_abstime _last_adrc_observer_update{0};
+	
+	// ADRC control state
+	bool _adrc_enabled{false};
+	float _base_throttle{0.0f};
 
 	bool _spooled_up{false}; ///< used to make sure the vehicle cannot take off during the spoolup time
 	bool _landed{true};
@@ -169,6 +183,20 @@ private:
 		(ParamInt<px4::params::MPC_THR_CURVE>) _param_mpc_thr_curve,
 		(ParamFloat<px4::params::MPC_YAW_EXPO>) _param_mpc_yaw_expo,
 
-		(ParamFloat<px4::params::COM_SPOOLUP_TIME>) _param_com_spoolup_time
+		(ParamFloat<px4::params::COM_SPOOLUP_TIME>) _param_com_spoolup_time,
+
+		// ADRC attitude control parameters
+		(ParamInt<px4::params::MC_ADRC_ATT_EN>) _param_mc_adrc_att_en,
+		(ParamFloat<px4::params::MC_ADRC_TD_R2>) _param_mc_adrc_td_r2,
+		(ParamFloat<px4::params::MC_ADRC_TD_H2F>) _param_mc_adrc_td_h2f,
+		(ParamFloat<px4::params::MC_ADRC_TD_R0>) _param_mc_adrc_td_r0,
+		(ParamFloat<px4::params::MC_ADRC_NLSEF_R1>) _param_mc_adrc_nlsef_r1,
+		(ParamFloat<px4::params::MC_ADRC_NLSEF_H1>) _param_mc_adrc_nlsef_h1,
+		(ParamFloat<px4::params::MC_ADRC_NLSEF_C>) _param_mc_adrc_nlsef_c,
+		(ParamFloat<px4::params::MC_ADRC_NLSEF_KI>) _param_mc_adrc_nlsef_ki,
+		(ParamFloat<px4::params::MC_ADRC_LESO_W>) _param_mc_adrc_leso_w,
+		(ParamFloat<px4::params::MC_ADRC_GAMMA>) _param_mc_adrc_gamma,
+		(ParamFloat<px4::params::MC_ADRC_B0>) _param_mc_adrc_b0,
+		(ParamInt<px4::params::MC_ADRC_OBS_FREQ>) _param_mc_adrc_obs_freq
 	)
 };

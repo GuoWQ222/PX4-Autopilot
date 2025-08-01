@@ -91,10 +91,20 @@ MulticopterRateControl::parameters_updated()
 	_rate_control.setFeedForwardGain(
 		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
 
+	// ADRC parameters
+	_adrc_control.setADRCGains(
+		Vector3f(_param_mc_adrc_td_h0_r.get(), _param_mc_adrc_td_h0_p.get(), _param_mc_adrc_td_h0_y.get()),
+		Vector3f(_param_mc_adrc_td_r0_r.get(), _param_mc_adrc_td_r0_p.get(), _param_mc_adrc_td_r0_y.get()),
+		Vector3f(_param_mc_adrc_eso_b1_r.get(), _param_mc_adrc_eso_b1_p.get(), _param_mc_adrc_eso_b1_y.get()),
+		Vector3f(_param_mc_adrc_eso_b0_r.get(), _param_mc_adrc_eso_b0_p.get(), _param_mc_adrc_eso_b0_y.get()),
+		Vector3f(_param_mc_adrc_sef_r1_r.get(), _param_mc_adrc_sef_r1_p.get(), _param_mc_adrc_sef_r1_y.get()),
+		Vector3f(_param_mc_adrc_sef_h1_r.get(), _param_mc_adrc_sef_h1_p.get(), _param_mc_adrc_sef_h1_y.get()),
+		Vector3f(_param_mc_adrc_sef_c_r.get(), _param_mc_adrc_sef_c_p.get(), _param_mc_adrc_sef_c_y.get()),
+		Vector3f(0.0f, 0.0f, 0.0f)); // nlsef_ki parameters - set to zero for now
 
 	// manual rate control acro mode rate limits
 	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
-				  radians(_param_mc_acro_y_max.get()));
+				radians(_param_mc_acro_y_max.get()));
 
 	_output_lpf_yaw.setCutoffFreq(_param_mc_yaw_tq_cutoff.get());
 }
@@ -177,6 +187,7 @@ MulticopterRateControl::Run()
 			}
 
 		} else if (_vehicle_rates_setpoint_sub.update(&vehicle_rates_setpoint)) {
+			//直接从 vehicle_rates_setpoint主题中订阅由姿态控制器（mc_attitude_control）发布的角速度设定点。
 			if (_vehicle_rates_setpoint_sub.copy(&vehicle_rates_setpoint)) {
 				_rates_setpoint(0) = PX4_ISFINITE(vehicle_rates_setpoint.roll)  ? vehicle_rates_setpoint.roll  : rates(0);
 				_rates_setpoint(1) = PX4_ISFINITE(vehicle_rates_setpoint.pitch) ? vehicle_rates_setpoint.pitch : rates(1);
@@ -216,15 +227,106 @@ MulticopterRateControl::Run()
 			}
 
 			// run rate controller
-			Vector3f torque_setpoint =
-				_rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+			Vector3f torque_setpoint;
+
+			if (_param_mc_adrc_enable.get()) {
+				// Use ADRC controller
+				torque_setpoint = _adrc_control.update(rates, _rates_setpoint, dt);
+
+				// Debug output for ADRC rate control (rate limited to avoid spam)
+				static hrt_abstime last_adrc_debug_time = 0;
+				static Vector3f last_adrc_rates{0.0f, 0.0f, 0.0f};
+				static Vector3f last_adrc_rates_sp{0.0f, 0.0f, 0.0f};
+				static Vector3f last_adrc_torque{0.0f, 0.0f, 0.0f};
+				static Vector3f last_adrc_angular_accel{0.0f, 0.0f, 0.0f};
+
+				const hrt_abstime current_time = hrt_absolute_time();
+				const Vector3f current_rates{rates};
+				const Vector3f current_rates_sp{_rates_setpoint};
+				const Vector3f current_torque{torque_setpoint};
+				const Vector3f current_angular_accel{angular_accel};
+
+				// Output every 500ms and only if values changed significantly
+				if ((current_time - last_adrc_debug_time) > 500000 && // 500ms = 500000us
+					(fabsf(current_rates(0) - last_adrc_rates(0)) > 0.01f ||
+					fabsf(current_rates(1) - last_adrc_rates(1)) > 0.01f ||
+					fabsf(current_rates(2) - last_adrc_rates(2)) > 0.01f ||
+					fabsf(current_rates_sp(0) - last_adrc_rates_sp(0)) > 0.01f ||
+					fabsf(current_rates_sp(1) - last_adrc_rates_sp(1)) > 0.01f ||
+					fabsf(current_rates_sp(2) - last_adrc_rates_sp(2)) > 0.01f ||
+					fabsf(current_torque(0) - last_adrc_torque(0)) > 0.01f ||
+					fabsf(current_torque(1) - last_adrc_torque(1)) > 0.01f ||
+					fabsf(current_torque(2) - last_adrc_torque(2)) > 0.01f)) {
+
+					PX4_INFO("[ADRC_RATE_DEBUG] 角速度: %.3f,%.3f,%.3f | 角速度设定点: %.3f,%.3f,%.3f | 扭矩输出: %.3f,%.3f,%.3f | 角加速度: %.3f,%.3f,%.3f | 时间步长: %.6f",
+						(double)current_rates(0), (double)current_rates(1), (double)current_rates(2),
+						(double)current_rates_sp(0), (double)current_rates_sp(1), (double)current_rates_sp(2),
+						(double)current_torque(0), (double)current_torque(1), (double)current_torque(2),
+						(double)current_angular_accel(0), (double)current_angular_accel(1), (double)current_angular_accel(2),
+						(double)dt);
+
+					last_adrc_debug_time = current_time;
+					last_adrc_rates = current_rates;
+					last_adrc_rates_sp = current_rates_sp;
+					last_adrc_torque = current_torque;
+					last_adrc_angular_accel = current_angular_accel;
+				}
+			} else {
+				// Use traditional PID controller
+				torque_setpoint = _rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+
+				// Debug output for traditional PID rate control (rate limited)
+				static hrt_abstime last_pid_rate_debug_time = 0;
+				static Vector3f last_pid_rates{0.0f, 0.0f, 0.0f};
+				static Vector3f last_pid_rates_sp{0.0f, 0.0f, 0.0f};
+				static Vector3f last_pid_torque{0.0f, 0.0f, 0.0f};
+				static Vector3f last_pid_angular_accel{0.0f, 0.0f, 0.0f};
+
+				const hrt_abstime current_time = hrt_absolute_time();
+				const Vector3f current_rates{rates};
+				const Vector3f current_rates_sp{_rates_setpoint};
+				const Vector3f current_torque{torque_setpoint};
+				const Vector3f current_angular_accel{angular_accel};
+
+				// Output every 500ms and only if values changed significantly
+				if ((current_time - last_pid_rate_debug_time) > 500000 && // 500ms = 500000us
+					(fabsf(current_rates(0) - last_pid_rates(0)) > 0.01f ||
+					fabsf(current_rates(1) - last_pid_rates(1)) > 0.01f ||
+					fabsf(current_rates(2) - last_pid_rates(2)) > 0.01f ||
+					fabsf(current_rates_sp(0) - last_pid_rates_sp(0)) > 0.01f ||
+					fabsf(current_rates_sp(1) - last_pid_rates_sp(1)) > 0.01f ||
+					fabsf(current_rates_sp(2) - last_pid_rates_sp(2)) > 0.01f ||
+					fabsf(current_torque(0) - last_pid_torque(0)) > 0.01f ||
+					fabsf(current_torque(1) - last_pid_torque(1)) > 0.01f ||
+					fabsf(current_torque(2) - last_pid_torque(2)) > 0.01f)) {
+
+					PX4_INFO("[PID_RATE_DEBUG] 角速度: %.3f,%.3f,%.3f | 角速度设定点: %.3f,%.3f,%.3f | 扭矩输出: %.3f,%.3f,%.3f | 角加速度: %.3f,%.3f,%.3f | 时间步长: %.6f",
+						(double)current_rates(0), (double)current_rates(1), (double)current_rates(2),
+						(double)current_rates_sp(0), (double)current_rates_sp(1), (double)current_rates_sp(2),
+						(double)current_torque(0), (double)current_torque(1), (double)current_torque(2),
+						(double)current_angular_accel(0), (double)current_angular_accel(1), (double)current_angular_accel(2),
+						(double)dt);
+
+					last_pid_rate_debug_time = current_time;
+					last_pid_rates = current_rates;
+					last_pid_rates_sp = current_rates_sp;
+					last_pid_torque = current_torque;
+					last_pid_angular_accel = current_angular_accel;
+				}
+			}
 
 			// apply low-pass filtering on yaw axis to reduce high frequency torque caused by rotor acceleration
 			torque_setpoint(2) = _output_lpf_yaw.update(torque_setpoint(2), dt);
 
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
-			_rate_control.getRateControlStatus(rate_ctrl_status);
+
+			if (_param_mc_adrc_enable.get()) {
+				_adrc_control.getADRCStatus(rate_ctrl_status);
+			} else {
+				_rate_control.getRateControlStatus(rate_ctrl_status);
+			}
+
 			rate_ctrl_status.timestamp = hrt_absolute_time();
 			_controller_status_pub.publish(rate_ctrl_status);
 

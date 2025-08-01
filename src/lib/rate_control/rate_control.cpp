@@ -69,7 +69,7 @@ void RateControl::setNegativeSaturationFlag(size_t axis, bool is_saturated)
 }
 
 Vector3f RateControl::update(const Vector3f &rate, const Vector3f &rate_sp, const Vector3f &angular_accel,
-			     const float dt, const bool landed)
+			const float dt, const bool landed)
 {
 	// angular rates error
 	Vector3f rate_error = rate_sp - rate;

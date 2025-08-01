@@ -34,6 +34,7 @@
 #pragma once
 
 #include <lib/rate_control/rate_control.hpp>
+#include <lib/rate_control/adrc_control.hpp>
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
@@ -91,6 +92,7 @@ private:
 	void updateActuatorControlsStatus(const vehicle_torque_setpoint_s &vehicle_torque_setpoint, float dt);
 
 	RateControl _rate_control; ///< class for rate control calculations
+	ADRCControl _adrc_control; ///< class for ADRC rate control calculations
 
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _control_allocator_status_sub{ORB_ID(control_allocator_status)};
@@ -154,6 +156,39 @@ private:
 		(ParamFloat<px4::params::MC_YAWRATE_FF>) _param_mc_yawrate_ff,
 		(ParamFloat<px4::params::MC_YAWRATE_K>) _param_mc_yawrate_k,
 		(ParamFloat<px4::params::MC_YAW_TQ_CUTOFF>) _param_mc_yaw_tq_cutoff,
+
+		// ADRC parameters
+		(ParamBool<px4::params::MC_ADRC_ENABLE>) _param_mc_adrc_enable,
+		(ParamFloat<px4::params::MC_ADRC_TD_H0_R>) _param_mc_adrc_td_h0_r,
+		(ParamFloat<px4::params::MC_ADRC_TD_H0_P>) _param_mc_adrc_td_h0_p,
+		(ParamFloat<px4::params::MC_ADRC_TD_H0_Y>) _param_mc_adrc_td_h0_y,
+		(ParamFloat<px4::params::MC_ADRC_TD_R0_R>) _param_mc_adrc_td_r0_r,
+		(ParamFloat<px4::params::MC_ADRC_TD_R0_P>) _param_mc_adrc_td_r0_p,
+		(ParamFloat<px4::params::MC_ADRC_TD_R0_Y>) _param_mc_adrc_td_r0_y,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B1_R>) _param_mc_adrc_eso_b1_r,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B1_P>) _param_mc_adrc_eso_b1_p,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B1_Y>) _param_mc_adrc_eso_b1_y,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B2_R>) _param_mc_adrc_eso_b2_r,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B2_P>) _param_mc_adrc_eso_b2_p,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B2_Y>) _param_mc_adrc_eso_b2_y,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B0_R>) _param_mc_adrc_eso_b0_r,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B0_P>) _param_mc_adrc_eso_b0_p,
+		(ParamFloat<px4::params::MC_ADRC_ESO_B0_Y>) _param_mc_adrc_eso_b0_y,
+		(ParamFloat<px4::params::MC_ADRC_SEF_R1_R>) _param_mc_adrc_sef_r1_r,
+		(ParamFloat<px4::params::MC_ADRC_SEF_R1_P>) _param_mc_adrc_sef_r1_p,
+		(ParamFloat<px4::params::MC_ADRC_SEF_R1_Y>) _param_mc_adrc_sef_r1_y,
+		(ParamFloat<px4::params::MC_ADRC_SEF_H1_R>) _param_mc_adrc_sef_h1_r,
+		(ParamFloat<px4::params::MC_ADRC_SEF_H1_P>) _param_mc_adrc_sef_h1_p,
+		(ParamFloat<px4::params::MC_ADRC_SEF_H1_Y>) _param_mc_adrc_sef_h1_y,
+		(ParamFloat<px4::params::MC_ADRC_SEF_C_R>) _param_mc_adrc_sef_c_r,
+		(ParamFloat<px4::params::MC_ADRC_SEF_C_P>) _param_mc_adrc_sef_c_p,
+		(ParamFloat<px4::params::MC_ADRC_SEF_C_Y>) _param_mc_adrc_sef_c_y,
+		(ParamFloat<px4::params::MC_ADRC_ALPHA_R>) _param_mc_adrc_alpha_r,
+		(ParamFloat<px4::params::MC_ADRC_ALPHA_P>) _param_mc_adrc_alpha_p,
+		(ParamFloat<px4::params::MC_ADRC_ALPHA_Y>) _param_mc_adrc_alpha_y,
+		(ParamFloat<px4::params::MC_ADRC_DELTA_R>) _param_mc_adrc_delta_r,
+		(ParamFloat<px4::params::MC_ADRC_DELTA_P>) _param_mc_adrc_delta_p,
+		(ParamFloat<px4::params::MC_ADRC_DELTA_Y>) _param_mc_adrc_delta_y,
 
 		(ParamFloat<px4::params::MC_ACRO_R_MAX>) _param_mc_acro_r_max,
 		(ParamFloat<px4::params::MC_ACRO_P_MAX>) _param_mc_acro_p_max,

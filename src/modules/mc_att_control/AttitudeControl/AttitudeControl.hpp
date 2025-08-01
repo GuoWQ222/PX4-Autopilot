@@ -100,6 +100,12 @@ public:
 	 */
 	matrix::Vector3f update(const matrix::Quatf &q) const;
 
+	/**
+	 * Get the current attitude setpoint
+	 * @return current attitude setpoint quaternion
+	 */
+	matrix::Quatf getAttitudeSetpoint() const { return _attitude_setpoint_q; }
+
 private:
 	matrix::Vector3f _proportional_gain;
 	matrix::Vector3f _rate_limit;

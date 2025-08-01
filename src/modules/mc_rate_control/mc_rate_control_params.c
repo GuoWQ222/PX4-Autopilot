@@ -305,3 +305,434 @@ PARAM_DEFINE_INT32(MC_BAT_SCALE_EN, 0);
  * @group Multicopter Rate Control
  */
 PARAM_DEFINE_FLOAT(MC_YAW_TQ_CUTOFF, 2.f);
+
+/**
+ * Enable ADRC (Active Disturbance Rejection Control) for rate control
+ *
+ * Enable ADRC rate control instead of traditional PID control.
+ * When enabled, ADRC parameters are used instead of PID parameters.
+ *
+ * @boolean
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_INT32(MC_ADRC_ENABLE, 0);
+
+/**
+ * ADRC roll axis TD time constant (h0)
+ *
+ * Time constant for Tracking Differentiator on roll axis.
+ * Controls the smoothness of the reference tracking.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 4
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_H0_R, 0.004f);
+
+/**
+ * ADRC pitch axis TD time constant (h0)
+ *
+ * Time constant for Tracking Differentiator on pitch axis.
+ * Controls the smoothness of the reference tracking.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 4
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_H0_P, 0.004f);
+
+/**
+ * ADRC yaw axis TD time constant (h0)
+ *
+ * Time constant for Tracking Differentiator on yaw axis.
+ * Controls the smoothness of the reference tracking.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 4
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_H0_Y, 0.004f);
+
+/**
+ * ADRC roll axis TD gain (r0)
+ *
+ * Gain for Tracking Differentiator on roll axis.
+ * Higher values provide faster tracking but may cause oscillations.
+ *
+ * @min 100.0
+ * @max 5000.0
+ * @decimal 1
+ * @increment 100.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_R0_R, 1000.0f);
+
+/**
+ * ADRC pitch axis TD gain (r0)
+ *
+ * Gain for Tracking Differentiator on pitch axis.
+ * Higher values provide faster tracking but may cause oscillations.
+ *
+ * @min 100.0
+ * @max 5000.0
+ * @decimal 1
+ * @increment 100.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_R0_P, 1000.0f);
+
+/**
+ * ADRC yaw axis TD gain (r0)
+ *
+ * Gain for Tracking Differentiator on yaw axis.
+ * Higher values provide faster tracking but may cause oscillations.
+ *
+ * @min 100.0
+ * @max 5000.0
+ * @decimal 1
+ * @increment 100.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_TD_R0_Y, 1000.0f);
+
+/**
+ * ADRC roll axis ESO beta1 gain
+ *
+ * Observer gain beta1 for Extended State Observer on roll axis.
+ * Controls the observer convergence speed.
+ *
+ * @min 10.0
+ * @max 200.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B1_R, 70.0f);
+
+/**
+ * ADRC pitch axis ESO beta1 gain
+ *
+ * Observer gain beta1 for Extended State Observer on pitch axis.
+ * Controls the observer convergence speed.
+ *
+ * @min 10.0
+ * @max 200.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B1_P, 70.0f);
+
+/**
+ * ADRC yaw axis ESO beta1 gain
+ *
+ * Observer gain beta1 for Extended State Observer on yaw axis.
+ * Controls the observer convergence speed.
+ *
+ * @min 10.0
+ * @max 200.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B1_Y, 70.0f);
+
+/**
+ * ADRC roll axis ESO beta2 gain
+ *
+ * Observer gain beta2 for Extended State Observer on roll axis.
+ * Controls the disturbance estimation capability.
+ *
+ * @min 500.0
+ * @max 10000.0
+ * @decimal 1
+ * @increment 100.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B2_R, 2500.0f);
+
+/**
+ * ADRC pitch axis ESO beta2 gain
+ *
+ * Observer gain beta2 for Extended State Observer on pitch axis.
+ * Controls the disturbance estimation capability.
+ *
+ * @min 500.0
+ * @max 10000.0
+ * @decimal 1
+ * @increment 100.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B2_P, 2500.0f);
+
+/**
+ * ADRC yaw axis ESO beta2 gain
+ *
+ * Observer gain beta2 for Extended State Observer on yaw axis.
+ * Controls the disturbance estimation capability.
+ *
+ * @min 500.0
+ * @max 10000.0
+ * @decimal 1
+ * @increment 100.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B2_Y, 2500.0f);
+
+/**
+ * ADRC roll axis ESO b0 control gain
+ *
+ * Control gain b0 for Extended State Observer on roll axis.
+ * Represents the control effectiveness.
+ *
+ * @min 50.0
+ * @max 1000.0
+ * @decimal 1
+ * @increment 10.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B0_R, 400.0f);
+
+/**
+ * ADRC pitch axis ESO b0 control gain
+ *
+ * Control gain b0 for Extended State Observer on pitch axis.
+ * Represents the control effectiveness.
+ *
+ * @min 50.0
+ * @max 1000.0
+ * @decimal 1
+ * @increment 10.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B0_P, 400.0f);
+
+/**
+ * ADRC yaw axis ESO b0 control gain
+ *
+ * Control gain b0 for Extended State Observer on yaw axis.
+ * Represents the control effectiveness.
+ *
+ * @min 50.0
+ * @max 1000.0
+ * @decimal 1
+ * @increment 10.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ESO_B0_Y, 400.0f);
+
+/**
+ * ADRC roll axis NLSEF r1 gain
+ *
+ * Nonlinear State Error Feedback gain r1 for roll axis.
+ * Controls the position error feedback strength.
+ *
+ * @min 10.0
+ * @max 500.0
+ * @decimal 1
+ * @increment 10.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_R1_R, 100.0f);
+
+/**
+ * ADRC pitch axis NLSEF r1 gain
+ *
+ * Nonlinear State Error Feedback gain r1 for pitch axis.
+ * Controls the position error feedback strength.
+ *
+ * @min 10.0
+ * @max 500.0
+ * @decimal 1
+ * @increment 10.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_R1_P, 100.0f);
+
+/**
+ * ADRC yaw axis NLSEF r1 gain
+ *
+ * Nonlinear State Error Feedback gain r1 for yaw axis.
+ * Controls the position error feedback strength.
+ *
+ * @min 10.0
+ * @max 500.0
+ * @decimal 1
+ * @increment 10.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_R1_Y, 100.0f);
+
+/**
+ * ADRC roll axis NLSEF h1 gain
+ *
+ * Nonlinear State Error Feedback gain h1 for roll axis.
+ * Controls the velocity error feedback strength.
+ *
+ * @min 5.0
+ * @max 200.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_H1_R, 50.0f);
+
+/**
+ * ADRC pitch axis NLSEF h1 gain
+ *
+ * Nonlinear State Error Feedback gain h1 for pitch axis.
+ * Controls the velocity error feedback strength.
+ *
+ * @min 5.0
+ * @max 200.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_H1_P, 50.0f);
+
+/**
+ * ADRC yaw axis NLSEF h1 gain
+ *
+ * Nonlinear State Error Feedback gain h1 for yaw axis.
+ * Controls the velocity error feedback strength.
+ *
+ * @min 5.0
+ * @max 200.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_H1_Y, 50.0f);
+
+/**
+ * ADRC roll axis NLSEF c gain
+ *
+ * Nonlinear State Error Feedback nonlinear factor c for roll axis.
+ * Controls the nonlinearity strength.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 3
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_C_R, 0.01f);
+
+/**
+ * ADRC pitch axis NLSEF c gain
+ *
+ * Nonlinear State Error Feedback nonlinear factor c for pitch axis.
+ * Controls the nonlinearity strength.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 3
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_C_P, 0.01f);
+
+/**
+ * ADRC yaw axis NLSEF c gain
+ *
+ * Nonlinear State Error Feedback nonlinear factor c for yaw axis.
+ * Controls the nonlinearity strength.
+ *
+ * @min 0.001
+ * @max 0.1
+ * @decimal 3
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_SEF_C_Y, 0.01f);
+
+/**
+ * ADRC roll axis ESO nonlinear factor (alpha)
+ *
+ * Nonlinear factor for Extended State Observer on roll axis.
+ * Controls the nonlinearity strength of the observer.
+ *
+ * @min 0.1
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ALPHA_R, 0.25f);
+
+/**
+ * ADRC pitch axis ESO nonlinear factor (alpha)
+ *
+ * Nonlinear factor for Extended State Observer on pitch axis.
+ * Controls the nonlinearity strength of the observer.
+ *
+ * @min 0.1
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ALPHA_P, 0.25f);
+
+/**
+ * ADRC yaw axis ESO nonlinear factor (alpha)
+ *
+ * Nonlinear factor for Extended State Observer on yaw axis.
+ * Controls the nonlinearity strength of the observer.
+ *
+ * @min 0.1
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_ALPHA_Y, 0.25f);
+
+/**
+ * ADRC roll axis ESO linear interval (delta)
+ *
+ * Linear interval for Extended State Observer on roll axis.
+ * Defines the linear region around zero.
+ *
+ * @min 0.001
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_DELTA_R, 0.1f);
+
+/**
+ * ADRC pitch axis ESO linear interval (delta)
+ *
+ * Linear interval for Extended State Observer on pitch axis.
+ * Defines the linear region around zero.
+ *
+ * @min 0.001
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_DELTA_P, 0.1f);
+
+/**
+ * ADRC yaw axis ESO linear interval (delta)
+ *
+ * Linear interval for Extended State Observer on yaw axis.
+ * Defines the linear region around zero.
+ *
+ * @min 0.001
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(MC_ADRC_DELTA_Y, 0.1f);
